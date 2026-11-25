@@ -1090,7 +1090,7 @@
           el("div", { class: "numero" }, el("span", { class: "numero-valor num" }, String(PERG.total)), el("span", { class: "numero-rotulo" }, "perguntas")),
           el("div", { class: "numero" }, el("span", { class: "numero-valor num b8-ok" }, String(PERG.sozinho)), el("span", { class: "numero-rotulo" }, "respondidas sem te chamar")),
           el("div", { class: "numero" }, el("span", { class: "numero-valor num" }, String(PERG.total - PERG.sozinho)), el("span", { class: "numero-rotulo" }, "esperando você"))),
-        el("ul", { class: "lista" }, PERG.esperando.map((q) => linhaAcao(q.txt, q.imp, "Responder e virar regra", null, el("span", { class: "chip b8-chip-tipo" }, "Pergunta da " + q.papel)))),
+        el("ul", { class: "lista" }, PERG.esperando.map((q) => linhaAcao(q.txt, q.imp, "Responder e virar regra", null, el("span", { class: "chip b8-chip-tipo" }, "Pergunta " + ({ Investidor: "do investidor", Diretoria: "da Diretoria", Comercial: "do Comercial" }[q.papel] || "de " + q.papel))))),
         el("p", { class: "t-pequeno texto-2 b8-papeis" }, "Quem pergunta, por papel: ", ...PERG.papeis.map(([p, n], i) => el("span", { class: "chip" }, p + " " + n))));
       const holder8 = el("div", { class: "b-carga" }); raiz.append(holder8);
       carga(holder8, el("div", { class: "b8-inicio-grade" }, el("div", { class: "pilha", style: { "--gap": "16px" } }, espera, listaAbertos), el("div", { class: "pilha", style: { "--gap": "16px" } }, melhorou, perguntas, fontes)), "cartoes", "inicio");

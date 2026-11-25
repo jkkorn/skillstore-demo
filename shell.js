@@ -45,6 +45,7 @@
  *   SK.toggle(rotulo, ligado, aoMudar) -> button.toggle
  *   SK.painel.abrir({ titulo, sobre, corpo, rodape, aoFechar }) / SK.painel.fechar() / SK.painel.aberto()
  *   A etiqueta "Protótipo · dados inventados" fica na barra do topo (.tag-prototipo), em todas as telas.
+ *   SK.etiqueta = ["Dados reais", " · Empresa"]  troca a etiqueta (defina antes do DOMContentLoaded, num script defer).
  *   SK.tema(id)                  troca o tema (eletrico | noite | mare); evento "sk:tema". Use só tokens: nada de cor escrita à mão.
  *   SK.marca(id, classe)         marca da ferramenta em tinta (gmail drive agenda intercom slack notion github whatsapp zendesk revenuecat
  *                                claude chatgpt; sem marca pública: tldv granola cloudhumans grok viram letra; "cerebro" = quadrado de tinta com "s")
@@ -474,9 +475,10 @@
       SK.el("button", { class: "btn btn-quieto btn-sm barra-seta", type: "button", "aria-label": "Próximo ato", on: { click: SK.proximo } }, SK.icone("seta", "ico-sm")),
       SK.el("button", { class: "btn btn-quieto btn-sm barra-reiniciar", type: "button", on: { click: reiniciar } }, SK.icone("reiniciar", "ico-sm"), SK.el("span", { class: "barra-reiniciar-txt" }, "Reiniciar")),
       SK.el("span", { class: "temas", role: "group", "aria-label": "Direção visual" }, ...TEMAS.map(([id, nome, cor]) => SK.el("button", { class: "tema-bt", type: "button", "data-tema": id, title: "Tema " + nome, "aria-label": "Tema " + nome, "aria-pressed": document.documentElement.dataset.tema === id ? "true" : "false", on: { click: () => SK.tema(id) } }, SK.el("span", { style: { background: cor } })))));
-    const quem = SK.el("div", { class: "barra-quem", "aria-label": "Conta" }, SK.el("span", { class: "barra-empresa t-pequeno" }, D.empresa.nome), SK.el("span", { class: "avatar avatar-sm avatar-retrato", title: D.usuaria.nome }, SK.retrato()));
-    const tag = SK.el("span", { class: "tag-prototipo", role: "note", title: "Protótipo · dados inventados", "aria-label": "Protótipo · dados inventados" },
-      SK.el("span", { "aria-hidden": "true" }, "Protótipo"), SK.el("span", { class: "tag-prototipo-resto", "aria-hidden": "true" }, " · dados inventados"));
+    const quem = SK.el("div", { class: "barra-quem", "aria-label": "Conta" }, SK.el("span", { class: "barra-empresa t-pequeno" }, D.empresa.nome), (D.usuaria.id === "marina" ? SK.el("span", { class: "avatar avatar-sm avatar-retrato", title: D.usuaria.nome }, SK.retrato()) : SK.el("span", { class: "avatar avatar-sm", title: D.usuaria.cargo }, D.usuaria.iniciais)));
+    const et = SK.etiqueta || ["Protótipo", " · dados inventados"]; // um site com dados reais troca isto antes de o DOM ficar pronto
+    const tag = SK.el("span", { class: "tag-prototipo" + (SK.etiqueta ? " tag-real" : ""), role: "note", title: et.join(""), "aria-label": et.join("") },
+      SK.el("span", { "aria-hidden": "true" }, et[0]), SK.el("span", { class: "tag-prototipo-resto", "aria-hidden": "true" }, et[1]));
     const pergunte = SK.el("button", { class: "btn btn-secundario btn-sm barra-pergunte", type: "button", title: "Pergunte ao cérebro (Ctrl ou Cmd + K)", "aria-keyshortcuts": "Control+K Meta+K", on: { click: () => SK.chat.abrir() } }, SK.icone("chat", "ico-sm"), SK.el("span", {}, "Pergunte"));
     const engrenagem = SK.el("a", { class: "btn btn-quieto btn-sm barra-config", href: "#/config", "aria-label": "Configurações", title: "Configurações" }, SK.el("span", { class: "ico-engrenagem", "aria-hidden": "true" }));
     engrenagem.querySelector("span").append(SK.icone("engrenagem"));

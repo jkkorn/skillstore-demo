@@ -518,3 +518,4 @@ body.em-casa .barra-seta { display: none; }
 .barra-pergunte { gap: 6px; }
 @media (max-width: 767px) { .barra-pergunte span { display: none; } .barra-pergunte { padding: 0 10px; } }
 .barra-config[aria-current="page"] { color: var(--acento-texto); background: var(--acento-lavado); }
+.btn[hidden] { display: none !important; }
