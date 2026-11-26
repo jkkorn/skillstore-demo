@@ -130,6 +130,12 @@
 
 
   /* ---------- DOM ---------- */
+  /* Num iframe com sandbox sem allow-forms, o navegador recusa o envio do formulário antes do evento submit.
+     Então o "enviar" vem do clique no botão de envio e do Enter num campo, com preventDefault (sem envio nativo). */
+  function enviarSemSubmit(form, fn) {
+    form.addEventListener("click", (ev) => { const b = ev.target.closest && ev.target.closest('button[type="submit"]'); if (b && form.contains(b)) { ev.preventDefault(); fn(ev); } });
+    form.addEventListener("keydown", (ev) => { if (ev.key === "Enter" && !ev.isComposing && ev.target.tagName === "INPUT") { ev.preventDefault(); fn(ev); } });
+  }
   SK.el = function (tag, attrs, ...filhos) {
     const svg = /^(svg|g|path|circle|line|rect|text|tspan|ellipse|polyline|defs|marker|clipPath|filter|feGaussianBlur|radialGradient|linearGradient|stop)$/.test(tag);
     const e = svg ? document.createElementNS("http://www.w3.org/2000/svg", tag) : document.createElement(tag);
@@ -137,8 +143,12 @@
       if (v == null || v === false) continue;
       if (k === "class") e.setAttribute("class", v);
       else if (k === "text") e.textContent = v;
-      else if (k === "on") for (const [ev, fn] of Object.entries(v)) e.addEventListener(ev, fn);
+      else if (k === "on") for (const [ev, fn] of Object.entries(v)) {
+        if (tag === "form" && ev === "submit") enviarSemSubmit(e, fn);
+        else e.addEventListener(ev, fn);
+      }
       else if (k === "style" && typeof v === "object") Object.assign(e.style, v);
+      else if (k === "style") e.style.cssText = v; // pelo CSSOM: uma CSP sem 'unsafe-inline' bloqueia o atributo style, não o CSSOM
       else e.setAttribute(k, v === true ? "" : v);
     }
     for (const f of filhos.flat()) if (f != null && f !== false) e.append(typeof f === "string" || typeof f === "number" ? document.createTextNode(String(f)) : f);
