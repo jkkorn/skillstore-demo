@@ -602,7 +602,7 @@
       ["Criei o espaço da Lume", "Só você vê, até escolher quem mais vê", ""],
     ];
     const lista = el("ol", { class: "andaimes" });
-    const btn = el("button", { class: "btn btn-primario btn-largo", type: "button", disabled: animar ? true : null, on: { click: () => SK.ir(1) } }, "Conectar o " + suite().nome, SK.icone("seta", "ico-sm"));
+    const btn = el("button", { class: "btn btn-primario btn-largo", type: "button", disabled: animar ? true : null, on: { click: () => quemEQuem(st) } }, "Ver quem é quem", SK.icone("seta", "ico-sm"));
     const acao = el("div", { class: "lado-acao" }, btn);
     st.lado.append(el("div", { class: "lado-rolar" },
       el("h1", { class: "lado-titulo" }, animar ? "Montando seu espaço" : "Seu espaço está pronto"),
@@ -625,6 +625,38 @@
       SK.depois(450 + 3 * 750 + 100, fim);
       SK.anunciar("Montando o espaço da Lume Pagamentos.");
     } else { mapa.revelar(["pessoa:marina"], false); }
+  }
+
+  /* Quem é quem (P3): as contas do domínio em grupos; confirmar com um clique ou corrigir uma */
+  function quemEQuem(st) {
+    const e = SK.estado, Q = D.quemEQuem, conf = (e.quemEQuem = e.quemEQuem || { ok: {}, escolha: {} });
+    const rolar = st.lado.querySelector(".lado-rolar"), acao = st.lado.querySelector(".lado-acao");
+    const lista = el("div", { class: "pilha", style: "--gap:10px" });
+    function desenhar() {
+      lista.replaceChildren(...Q.grupos.map((g, i) => {
+        const ok = !!conf.ok[g.id];
+        const corpo = el("div", { class: "qq-grupo entra" + (ok ? " ok" : ""), style: "--atraso:" + i * 60 + "ms" },
+          el("div", { class: "qq-cab" }, el("span", { class: "forte" }, g.nome), el("span", { class: "qq-n num" }, String(g.n))),
+          el("div", { class: "qq-amostra" }, ...g.amostra.slice(0, 4).map((a) => el("span", { class: "chip chip-mini" }, a)), g.n > g.amostra.length ? el("span", { class: "chip chip-mini" }, "+" + (g.n - Math.min(4, g.amostra.length))) : null));
+        if (g.duvida) {
+          const d = g.duvida, atual = conf.escolha[g.id] || d.sugerida;
+          const ops = el("div", { class: "qq-ops", role: "radiogroup", "aria-label": d.conta });
+          d.opcoes.forEach((o) => { const b = el("button", { class: "qq-op", type: "button", role: "radio", "aria-checked": atual === o ? "true" : "false", on: { click: () => { conf.escolha[g.id] = o; SK.salvar(); desenhar(); } } }, o); ops.append(b); });
+          corpo.append(el("div", { class: "qq-corrige" }, el("span", {}, el("span", { class: "forte" }, d.conta), " · " + d.texto), ops));
+        }
+        corpo.append(ok ? el("p", { class: "t-pequeno r-ok" }, "Confirmado.") : el("button", { class: "btn btn-secundario btn-sm", type: "button", style: "align-self:flex-start", on: { click: () => { conf.ok[g.id] = true; SK.salvar(); desenhar(); } } }, "Está certo"));
+        return corpo;
+      }));
+      if (!SK.reduzido()) lista.querySelectorAll(".entra").forEach((x) => x.classList.remove("entra"));
+      const todos = Q.grupos.every((g) => conf.ok[g.id]);
+      prox.textContent = todos ? "Conectar o " + suite().nome : "Conectar o " + suite().nome + " (confirmo depois)";
+    }
+    rolar.replaceChildren(el("h1", { class: "lado-titulo entra" }, "Quem é quem"),
+      el("p", { class: "t-pequeno texto-2 entra" }, "Vi " + Q.total + " contas no domínio " + D.empresa.dominio + ". Confirme cada grupo, ou corrija uma conta: isso vai para o mapa."), lista);
+    const prox = el("span", {});
+    acao.replaceChildren(el("button", { class: "btn btn-primario btn-largo", type: "button", on: { click: () => SK.ir(1) } }, prox, SK.icone("seta", "ico-sm")));
+    desenhar();
+    SK.escalonar(lista, 60);
   }
 
   /* =============================== ATO 1 · Permissões e "Traga a sua IA" =============================== */
@@ -868,6 +900,9 @@
         return;
       }
       L.mapa.revelar(["pessoa:marina"], false);
+      const qq = SK.estado.quemEQuem;
+      if (qq && Object.keys(qq.ok || {}).length) { const caixa = (qq.escolha || {}).caixas || "Tesouraria", nota = (qq.escolha || {}).pessoas || "É um agente";
+        L.linhaFeed("Com o que você confirmou: a caixa financeiro@ fica com " + (caixa === "Diretoria" ? "a Diretoria" : caixa === "Operações" ? "Operações" : "a Tesouraria") + ", e notas@ " + (nota === "É um agente" ? "conta como agente, não como pessoa." : "conta como pessoa."), "Quem é quem"); }
       const ms = 1450, ini = 500;
       const meta = { meses: 18, conversas: D.leitura.gmail.conversas, documentos: D.leitura.drive.documentos };
       for (const k in meta) SK.contar(L.lido[k], 0, meta[k], SK.reduzido() ? 0 : ms * 5);
@@ -915,7 +950,7 @@
         ...recebe.map((x) => ["Recebe de " + nomeDe(x.de), x.sobre + " · " + x.porMes + " por mês", () => abrirPessoa(x.de), SK.icone("seta-esq")]),
       ])) : null,
       secao("Fontes", fontesLista([...sobe, ...recebe].slice(0, 4).map((x) => ({ fonte: x.fonte, rotulo: nomeFonte(x.fonte) + " · " + x.porMes + (x.porMes > 1 ? " mensagens" : " mensagem") + " por mês", texto: nomeDe(x.de) + " para " + nomeDe(x.para) + ": " + x.sobre.toLowerCase() + ", " + x.porMes + " por mês.", data: "últimos 30 dias" })))));
-    SK.painel.abrir({ titulo: p.nome, sobre: ext ? p.tipo + " · gente de fora" : p.cargo + " · " + time(p.time).nome, corpo });
+    SK.painel.abrir({ titulo: p.nome, sobre: ext ? p.tipo + " · gente de fora" : (id === "marina" ? "você · " : "") + p.cargo + " · " + time(p.time).nome, corpo });
   }
   function abrirTime(id, aoFechar) {
     const t = time(id);
@@ -927,7 +962,7 @@
     const resto = t.pessoas - ps.length;
     const corpo = el("div", { class: "pilha", style: "--gap:28px" },
       el("div", { class: "painel-numeros" }, el("div", { class: "numero" }, el("span", { class: "numero-valor num" }, String(t.pessoas)), el("span", { class: "numero-rotulo" }, "pessoas")), el("div", { class: "numero" }, el("span", { class: "numero-valor num" }, String(pr.length)), el("span", { class: "numero-rotulo" }, "processos mapeados")), el("div", { class: "numero" }, el("span", { class: "numero-valor num" }, String(reun.length)), el("span", { class: "numero-rotulo" }, "reuniões"))),
-      secao("Quem está no time", linhasClicaveis(ps.map((p) => [p.nome, p.cargo, () => abrirPessoa(p.id), p.id === "marina" ? el("span", { class: "avatar avatar-sm avatar-retrato" }, SK.retrato()) : el("span", { class: "avatar avatar-sm" }, p.iniciais)])),
+      secao("Quem está no time", linhasClicaveis(ps.map((p) => [p.nome, (p.id === "marina" ? "você · " : "") + p.cargo, () => abrirPessoa(p.id), p.id === "marina" ? el("span", { class: "avatar avatar-sm avatar-retrato" }, SK.retrato()) : el("span", { class: "avatar avatar-sm" }, p.iniciais)])),
         resto > 0 ? el("p", { class: "t-pequeno texto-2" }, "E mais " + resto + (resto > 1 ? " pessoas que aparecem pouco nos e-mails." : " pessoa que aparece pouco nos e-mails.")) : null),
       decide.length ? secao("O que o time decide", marcadores(decide)) : null,
       esperam.length ? secao("O que espera pelo time", marcadores(esperam)) : null,
@@ -955,7 +990,7 @@
   function abrirReuniao(id) {
     const r = D.reunioes.find((x) => x.id === id);
     const corpo = el("div", { class: "pilha", style: "--gap:28px" },
-      secao("Quem vai", linhasClicaveis(r.pessoas.map((x) => { const p = pessoa(x); return [p.nome, p.cargo, () => abrirPessoa(x), x === "marina" ? el("span", { class: "avatar avatar-sm avatar-retrato" }, SK.retrato()) : el("span", { class: "avatar avatar-sm" }, p.iniciais)]; }))),
+      secao("Quem vai", linhasClicaveis(r.pessoas.map((x) => { const p = pessoa(x); return [p.nome, (x === "marina" ? "você · " : "") + p.cargo, () => abrirPessoa(x), x === "marina" ? el("span", { class: "avatar avatar-sm avatar-retrato" }, SK.retrato()) : el("span", { class: "avatar avatar-sm" }, p.iniciais)]; }))),
       secao("O que se decide ali", marcadores(r.decide)),
       secao("O que escala para fora", el("p", {}, r.escalaPara)),
       secao("Fontes", fontesLista(r.fontes)));

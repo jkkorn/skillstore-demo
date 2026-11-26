@@ -25,6 +25,7 @@
  *   pergunta       a troca do ato 5 (evidência, pergunta, porque, resposta, aprofunda, resposta2, regra, atualizados, espera)
  *   skill          { nome, versao, aprovadaPor, quando, regra[], destinos[] }
  *   uso            { semana:12, semChamar:10, paramNaExcecao:2, conversas[] }
+ *   quemEQuem      { total, grupos[{ id, nome, n, amostra[], duvida? }] }  as contas do domínio (P3)
  *   areas          ['Operações','Tesouraria','Engenharia','RH','Diretoria']  guardrails padrão em guardrailsPadrao
  *   depois         textos do ato 8
  *   suites {google, microsoft} e fontesMicrosoft (X5). integracoes[].ganho / ganhoMicrosoft (pontos) e motivoGanho / motivoGanhoMicrosoft (X6).
@@ -342,6 +343,19 @@
 
   D.uso = { semana: 12, semChamar: 10, paramNaExcecao: 2,
     conversas: [{ quem: "Débora Lins", pergunta: "Pedido de antecipação da Loja Ventana, R$ 38 mil. Posso aprovar?", resposta: "Pode. Até R$ 50 mil a Tesouraria aprova. Antes, confira se a Loja Ventana teve chargeback nos últimos 90 dias: se teve, passa pela Marina." }] };
+
+  // Quem é quem (P3): as contas do domínio, em grupos, para a pessoa confirmar logo depois de entrar. Somam 61.
+  D.quemEQuem = {
+    total: 61,
+    grupos: [
+      { id: "pessoas", nome: "Pessoas", n: 54, amostra: ["Otávio Reis", "Paula Menezes", "Caio Brandão", "Lívia Sato", "Sofia Almeida", "Rafael Prado"],
+        duvida: { conta: "notas@", texto: "Parece um robô: manda cerca de 400 e-mails por mês e nunca responde.", opcoes: ["É uma pessoa", "É um agente"], sugerida: "É um agente" } },
+      { id: "caixas", nome: "Caixas compartilhadas", n: 3, amostra: ["suporte@", "financeiro@", "repasses@"],
+        duvida: { conta: "financeiro@", texto: "Quem cuida desta caixa?", opcoes: ["Tesouraria", "Diretoria", "Operações"], sugerida: "Tesouraria" } },
+      { id: "agentes", nome: "Agentes e robôs", n: 2, amostra: ["relatorios@", "alertas-gateway@"] },
+      { id: "paradas", nome: "Sem uso há 90 dias", n: 2, amostra: ["o gerente de Operações que saiu em outubro", "uma conta de estágio"] },
+    ],
+  };
 
   D.areas = ["Operações", "Tesouraria", "Engenharia", "RH", "Diretoria"];
   D.guardrailsPadrao = { "Operações": D.areas.slice(), "Tesouraria": D.areas.slice(), "Engenharia": D.areas.slice(), "RH": D.areas.slice(), "Diretoria": D.areas.slice() };

@@ -58,6 +58,7 @@
  *                                forma: "lista" (padrão) | "cartoes" | "tabela" | "bloco" | "mapa". Use na primeira aparição do conteúdo
  *                                principal do ato e ao trocar de aba. Cancelado sozinho ao sair do ato.
  *   SK.esqueleto(forma)          só o esqueleto (elemento), se quiser montar o seu. Classes: .esqueleto (bloco) .esq-linha .esq-linha-curta .esq-titulo .esq-circulo .esq-cartao
+ *   SK.skillViva(op)              a skill sendo escrita ao vivo, em seções (ver o bloco no código)
  *   SK.passos(el, rotulos, { ms })  -> Promise   passos que se completam um a um (pendente, andando, feito) dentro de el;
  *                                use onde o produto "faz" algo (conectar fonte, escrever a regra, criar o espaço). ms por passo (padrão 420).
  *   SK.escalonar(nos, passo=45)   entrada escalonada (fade + subida) para uma lista de elementos ou os filhos de um contêiner.
@@ -308,6 +309,61 @@
   SK.escalonar = function (nos, passo) {
     const lista = nos instanceof Element ? [...nos.children] : [...nos];
     lista.forEach((n, i) => { n.style.setProperty("--atraso", Math.min(i, 12) * (passo || 45) + "ms"); n.classList.remove("entra"); void n.offsetWidth; n.classList.add("entra"); });
+  };
+
+  /* ---------- a skill sendo escrita ao vivo (P4) ----------
+   * SK.skillViva({ titulo, aoFonte(item) }) -> { el, adicionar(secao, texto, { de, origem, fonte }), organizar(texto, { de, conectadas }), secoes() }
+   * Seções: regra, condicoes, excecoes, fluxo, termos, quem, fontes, organizar. Cada linha leva a etiqueta da resposta de onde veio
+   * e acende ao chegar. organizar() é uma heurística visível (se/quando/caso → Condições; mas/exceto/a não ser → Exceções;
+   * nomes próprios e palavras entre aspas → Termos; ferramenta fora das conectadas → Fontes que faltam; o resto → A organizar). */
+  const SECOES = [["regra", "Regra"], ["condicoes", "Condições"], ["excecoes", "Exceções"], ["fluxo", "Fluxo"], ["termos", "Termos"], ["quem", "Quem pode fazer"], ["fontes", "Fontes que faltam"], ["organizar", "A organizar"]];
+  const FERRAMENTAS = ["Amplitude", "Mixpanel", "Google Analytics", "Hotjar", "HubSpot", "Zendesk", "Intercom", "Slack", "Notion", "Stripe", "WhatsApp", "Gmail", "Drive", "Jira", "Trello", "Excel", "Sheets", "Typeform", "Freshdesk", "Mercado Pago", "Pipedrive", "Salesforce", "Metabase", "Looker", "RevenueCat", "Firebase", "Teams", "Outlook"];
+  SK.skillViva = function (op) {
+    op = op || {};
+    const raiz = SK.el("div", { class: "sv", "aria-live": "polite" });
+    const nota = SK.el("p", { class: "sv-nota t-micro", hidden: true }, "Organizei pelo texto; confira.");
+    const corpos = {}, secs = {};
+    raiz.append(SK.el("div", { class: "sv-topo" }, SK.el("h2", { class: "sv-tit" }, op.titulo || "A skill, sendo escrita"), SK.el("span", { class: "sv-sub t-micro" }, "cada linha diz de qual resposta veio")), nota);
+    for (const [id, nome] of SECOES) {
+      const lista = SK.el("ul", { class: "sv-lista" });
+      const sec = SK.el("section", { class: "sv-sec sv-vazia", "data-secao": id }, SK.el("h3", { class: "sv-h" }, nome, SK.el("span", { class: "sv-n num", "data-ui-num": "linhas na seção" })), lista, SK.el("p", { class: "sv-vazio t-micro" }, "Ainda nada."));
+      corpos[id] = lista; secs[id] = sec; raiz.append(sec);
+    }
+    function adicionar(secao, texto, ex) {
+      ex = ex || {};
+      const s0 = secs[secao] ? secao : "organizar";
+      if (s0 === "fontes" && ex.fonte && corpos.fontes.querySelector('[data-fonte="' + ex.fonte + '"]')) return null; // a mesma fonte não entra duas vezes
+      const li = SK.el("li", { class: "sv-item sv-novo", "data-fonte": ex.fonte || null }, SK.el("span", { class: "sv-txt" }, texto), ex.de ? SK.el("span", { class: "sv-de chip chip-mini" }, ex.de) : null);
+      if (s0 === "fontes" && op.aoFonte) li.append(SK.el("button", { class: "btn btn-secundario btn-sm sv-acao", type: "button", on: { click: () => op.aoFonte(ex) } }, "Como conectar"));
+      if (ex.origem && op.aoOrigem) li.append(SK.el("button", { class: "sv-origem", type: "button", "aria-label": "De onde veio", on: { click: () => op.aoOrigem(texto, ex.origem) } }, SK.icone("fonte", "ico-sm")));
+      corpos[s0].append(li);
+      secs[s0].classList.remove("sv-vazia");
+      secs[s0].classList.remove("sv-acende"); void secs[s0].offsetWidth; secs[s0].classList.add("sv-acende");
+      secs[s0].querySelector(".sv-n").textContent = String(corpos[s0].children.length);
+      setTimeout(() => li.classList.remove("sv-novo"), SK.reduzido() ? 0 : 1600);
+      return li;
+    }
+    function organizar(texto, ex) {
+      ex = ex || {};
+      const conect = (ex.conectadas || []).map((x) => x.toLowerCase());
+      const itens = [];
+      const ferr = FERRAMENTAS.filter((f) => new RegExp("\\b" + f.replace(/ /g, "\\s") + "\\b", "i").test(texto) && !conect.includes(f.toLowerCase()));
+      ferr.forEach((f) => itens.push(["fontes", f + ": você citou, e eu ainda não vejo.", { fonte: f.toLowerCase() }]));
+      const termos = new Set();
+      (texto.match(/["“]([^"”]{2,40})["”]/g) || []).forEach((q) => termos.add(q.replace(/["“”]/g, "")));
+      (texto.match(/(?:[a-zà-ú,]\s)([A-Z][\wÀ-ú]+(?:\s[A-Z][\wÀ-ú]+)+)/g) || []).forEach((m) => termos.add(m.replace(/^[a-zà-ú,]\s/, "")));
+      [...termos].filter((t) => !ferr.some((f) => f.toLowerCase() === t.toLowerCase())).forEach((t) => itens.push(["termos", t + ": termo que você usou.", {}]));
+      texto.split(/(?<=[.!?])\s+/).map((x) => x.trim()).filter(Boolean).forEach((f) => {
+        const n = f.toLowerCase();
+        if (/(^|\s)(se|quando|caso)\s/.test(n)) itens.push(["condicoes", f, {}]);
+        else if (/(^|\s)(mas|exceto|a não ser)(\s|,)/.test(n)) itens.push(["excecoes", f, {}]);
+        else itens.push(["organizar", f, {}]);
+      });
+      itens.forEach(([sec, t, x]) => adicionar(sec, t, Object.assign({ de: ex.de }, x)));
+      nota.hidden = false;
+      return itens.length;
+    }
+    return { el: raiz, adicionar, organizar, secoes: () => Object.fromEntries(Object.keys(corpos).map((k) => [k, corpos[k].children.length])) };
   };
 
   /* ---------- conversa: contrato com o Builder C ---------- */

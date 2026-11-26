@@ -349,6 +349,25 @@
           el("div", { class: "b5-numeros" }, el("div", { class: "numero" }, el("span", { class: "numero-valor num" }, "23"), el("span", { class: "numero-rotulo" }, "pedidos por mês")), esperaN, paradosN)),
         g.el);
       ctx.append(cartaoRegra, cartaoQuem, cartaoBuraco);
+      /* a skill sendo escrita ao vivo: cada resposta entra na seção certa, com a etiqueta de onde veio */
+      const sv = SK.skillViva({ titulo: "A skill, sendo escrita" });
+      const regraAcoes = el("div", { class: "b5-regra-pe" });
+      cartaoRegra.append(sv.el, regraAcoes);
+      const conectadasNomes = () => ["Gmail", "Drive", "Agenda"].concat(D.integracoes.filter((i) => (e.conectadas || []).includes(i.id)).map((i) => i.nome));
+      let nResp = 0, temRegra = false;
+      function registrar(r0, t, resp, perguntou) {
+        nResp++;
+        const de = "resposta " + nResp;
+        const add = (sec, txt) => sv.adicionar(sec, txt, { de });
+        let algo = false;
+        const marca = () => { if (!temRegra) { temRegra = true; add("regra", "A aprovação depende do valor do pedido."); } algo = true; };
+        if (r.auto && r.auto !== r0.auto) { marca(); add("condicoes", "Se o pedido é abaixo de " + rs(r.auto) + ", então a aprovação é automática."); add("quem", "Ninguém: automático abaixo de " + rs(r.auto) + "."); }
+        if (r.tes && r.tes !== r0.tes) { marca(); add("condicoes", "Se o pedido vai " + (r.auto ? "de " + rs(r.auto) + " a " : "até ") + rs(r.tes) + ", então a Tesouraria aprova."); add("quem", "Tesouraria: Caio ou Débora."); }
+        if (r.slack && !r0.slack) { marca(); add("fluxo", "Acima de " + rs(r.tes || r.auto || 50000) + ": o pedido vai para o #antecipacoes; Marina ou " + DOUGLAS().primeiro + " dão o ok."); add("termos", "#antecipacoes: o canal do Slack onde os pedidos grandes esperam o ok."); }
+        if (r.exc && !r0.exc) { marca(); add("excecoes", "Lojista com chargeback nos últimos 90 dias: sempre a Marina, qualquer valor."); }
+        if (r.quem && !r0.quem) { algo = true; add("fluxo", "Antes: todos os pedidos iam por e-mail, do Caio para a Marina."); }
+        if (!algo && !perguntou && resp.some((x) => /^Anotei\./.test(x))) sv.organizar(t, { de, conectadas: conectadasNomes() });
+      }
 
       /* conversa */
       const fio = el("div", { class: "b5-fio", role: "log", "aria-label": "Conversa", "aria-live": "polite" });
@@ -429,8 +448,9 @@
         if (!t || ocupado) return;
         ocupado = true; caixa.value = ""; atualizarBotoes();
         msgDela(t, anim);
-        const antes = mudou(r), antesR = JSON.stringify(r);
+        const antes = mudou(r), antesR = JSON.stringify(r), r0 = Object.assign({}, r);
         const resp = entender(t);
+        registrar(r0, t, resp, /\?\s*$/.test(t));
         b.conversa.push(t);
         if (!e.respostas || !e.respostas.pergunta) e.respostas = { pergunta: t, aprofunda: "" }; else e.respostas.aprofunda = t;
         if (mudou(r)) e.buracoResolvido = true;
@@ -446,7 +466,7 @@
           if (!antes && mudou(r) && !r.exc && !b.fezAprofunda) { b.fezAprofunda = true; SK.salvar(); if (anim) SK.depois(380, () => pergunta2(true)); else pergunta2(false); }
           if (anim && mudouRegra && typeof SK.passos === "function" && !SK.reduzido()) {
             const caixaPassos = el("div", { class: "b5-passos" });
-            cartaoRegra.replaceChildren(el("div", { class: "fila", style: { "--gap": "8px" } }, el("h2", { class: "b-h2" }, "Escrevendo a regra…")), caixaPassos);
+            regraAcoes.replaceChildren(caixaPassos);
             SK.passos(caixaPassos, ["Lendo o que você escreveu", "Separando os 23 pedidos do mês por valor", "Escrevendo a regra e o efeito"], { ms: 240 }).then(terminar);
           } else terminar();
         });
@@ -484,14 +504,10 @@
       /* a regra viva */
       function redesenhar(anim) {
         const tem = mudou(r), ef = efeito(r);
-        cartaoRegra.replaceChildren(
-          el("div", { class: "fila", style: { "--gap": "8px" } }, el("h2", { class: "b-h2" }, tem ? "A regra, até agora" : "A regra"), el("span", { class: "chip" }, tem ? "Das suas palavras, hoje" : "Ainda não escrita")),
-          tem ? el("ol", { class: "b-faixas" }, faixas(r).map((f, i) => el("li", { class: "b-faixa b-faixa-" + f.tipo + (anim ? " entra" : ""), style: { "--atraso": i * 70 + "ms" } }, el("span", { class: "b-faixa-txt" }, f.txt), f.n != null ? el("span", { class: "b-faixa-n num" }, f.n + " por mês") : el("span", { class: "b-faixa-n" }, "exceção"))))
-            : el("p", { class: "texto-2" }, "Hoje: todos os 23 pedidos esperam você, por e-mail. Responda ao lado e eu escrevo a regra aqui, enquanto você fala."),
-          el("div", { class: "fila b5-regra-acoes" },
-            btn("btn-primario", e.regraAprovada ? "Ver a skill" : "Aprovar a regra", () => { if (!e.regraAprovada) { b.animarSkill = true; e.regraAprovada = true; padraoPergunta(e); SK.salvar(); } SK.ir(6); }, e.regraAprovada ? null : ic("check", "ico-sm")),
-            el("span", { class: "t-pequeno texto-2" }, e.regraAprovada ? "Aprovada por você hoje." : tem ? "Um clique e ela vira skill. Você muda quando quiser." : "")));
-        cartaoRegra.querySelector(".btn-primario").disabled = !tem && !e.regraAprovada;
+        regraAcoes.replaceChildren(el("div", { class: "fila b5-regra-acoes" },
+          btn("btn-primario", e.regraAprovada ? "Ver a skill" : "Revisar antes de publicar", () => SK.ir(6), ic("seta", "ico-sm")),
+          el("span", { class: "t-pequeno texto-2" }, e.regraAprovada ? "Publicada por você." : tem ? "Antes de publicar, você vê o antes e o depois." : "Responda ao lado e a skill vai se escrevendo aqui.")));
+        regraAcoes.querySelector(".btn-primario").disabled = !tem && !e.regraAprovada;
         cartaoQuem.hidden = !r.quem;
         if (r.quem) cartaoQuem.replaceChildren(el("h2", { class: "b-h2" }, "Quem participa"), quemParticipa(r, anim));
         espera.textContent = ef.esperaCurta;
@@ -507,15 +523,17 @@
       if (b.conversa.length) {
         const salvo = b.conversa.slice(); b.conversa = []; const r0 = Object.assign({}, r);
         Object.assign(r, { auto: null, tes: null, slack: false, exc: false, quem: false }); b.ultimo = null; b.fezAprofunda = false;
-        salvo.forEach((t) => { msgDela(t, false); const antes = mudou(r); const resp = entender(t); b.conversa.push(t); msgProduto(false, ...resp.map((x) => el("p", {}, x))); if (!antes && mudou(r) && !r.exc && !b.fezAprofunda) { b.fezAprofunda = true; pergunta2(false); } });
+        salvo.forEach((t) => { msgDela(t, false); const antes = mudou(r), r0 = Object.assign({}, r); const resp = entender(t); registrar(r0, t, resp, /\?\s*$/.test(t)); b.conversa.push(t); msgProduto(false, ...resp.map((x) => el("p", {}, x))); if (!antes && mudou(r) && !r.exc && !b.fezAprofunda) { b.fezAprofunda = true; pergunta2(false); } });
         if (!mudou(r) && mudou(r0)) Object.assign(r, r0);
       } else if (mudou(r)) {
+        registrar({ auto: null, tes: null, slack: false, exc: false, quem: false }, "", [], false);
         msgProduto(false, el("p", {}, "Esta é a regra que você aprovou. Pode mudar o que quiser: eu atualizo ao lado."));
       } else {
         fio.replaceChildren(); ocupado = true;
         this._inicio = () => { abertura(true); SK.depois(800, () => { pergunta1(true); ocupado = false; atualizarBotoes(); }); };
       }
       redesenhar(false); desenharSugestoes(); atualizarBotoes();
+      sv.el.querySelectorAll(".sv-novo, .sv-acende").forEach((x) => x.classList.remove("sv-novo", "sv-acende"));
     },
     entrar() { if (this._inicio) this._inicio(); },
     sair() { soltar(); },
@@ -562,132 +580,94 @@
     { id: "escreve", txt: "Pode escrever no #antecipacoes", sim: "Ela leva os pedidos grandes ao canal sozinha.", nao: "Ela não escreve no canal: avisa quem pediu para chamar Marina ou Douglas." },
   ];
   SK.ato({
-    id: 6, titulo: "Vira skill", nav: "Vira skill",
+    id: 6, titulo: "Antes de publicar", nav: "Skill",
     montar(sec) {
       const e = E(), b = B(), r = R();
       if (!mudou(r)) Object.assign(r, REGRA_COMPLETA);
       b.guarda = Object.assign({ aprova: true, status: true, conta: true, escreve: true, parcial: true }, b.guarda || {});
-      const animarSkill = !!b.animarSkill; b.animarSkill = false; SK.salvar();
-      const ef = efeito(r);
-      const raiz = el("div", { class: "ato-papel b-largo b6" });
+      b.conf = b.conf || {};
+      const ef = efeito(r), fx = faixas(r);
+      const faixaN = (q) => (D.antecipacoesPorFaixa.find((f) => f.faixa.startsWith(q)) || {}).quantos;
+      const raiz = el("div", { class: "ato-papel b-largo b6p" });
       raiz.append(el("div", { class: "ato-cabeca b-cabeca" }, el("div", { class: "pilha", style: { "--gap": "10px" } },
-        el("h1", { class: "t-titulo" }, "Dois cliques: vira skill e chega em quem trabalha"),
-        el("p", { class: "t-sub texto-2" }, "A regra que você escreveu passa a responder por você, onde o time já pergunta."))));
-
-      /* (1) a skill, compacta, com os guardrails dela */
-      const cartao = el("div", { class: "cartao b6-skill" });
-      const topo = el("div", { class: "b6-skill-topo" });
-      const corpo = el("div", { class: "b6-skill-corpo" });
-      cartao.append(topo, corpo);
-      const desenharTopo = (aprovada, anim) => {
-        topo.replaceChildren(); topo.append(
-          el("div", { class: "b6-selo" + (aprovada ? " ok" : "") + (anim ? " b6-carimbo" : "") }, aprovada ? ic("check") : ic("processo")),
-          el("div", { class: "pilha", style: { "--gap": "2px" } },
-            el("div", { class: "fila", style: { "--gap": "10px" } }, el("h2", { class: "b6-nome" }, D.skill.nome), el("span", { class: "chip" + (aprovada ? " chip-ok" : "") }, aprovada ? "Skill" : "Regra")),
-            el("p", { class: "t-pequeno texto-2 b6-meta" }, aprovada ? D.skill.nome + " · " + D.skill.versao + " · aprovada por " + D.skill.aprovadaPor + " " + D.skill.quando : "Escrita das suas palavras. Falta a sua aprovação.")),
-          aprovada ? el("span", { class: "b6-aprovar-vazio" }) : btn("btn-primario b6-aprovar", "Aprovar a regra", aprovar, ic("check", "ico-sm")));
-        cartao.classList.toggle("aprovada", aprovada);
-      };
-      corpo.append(
-        el("div", { class: "b6-col" }, el("h3", { class: "b-h3" }, "A regra"), el("ol", { class: "b-faixas b-faixas-sm" }, faixas(r).map((f) => el("li", { class: "b-faixa b-faixa-" + f.tipo }, el("span", { class: "b-faixa-txt" }, f.txt), el("span", { class: "b-faixa-n num" }, f.n != null ? f.n + " por mês" : "exceção"))))),
-        el("div", { class: "b6-col" }, el("h3", { class: "b-h3" }, "Guardrails desta skill"), guardas()));
-      function guardas() {
-        const lista = el("ul", { class: "b6-guardas" });
+        el("h1", { class: "t-titulo" }, "Antes de publicar"),
+        el("p", { class: "t-sub texto-2" }, D.skill.nome + " · " + (e.regraAprovada ? "publicada" : "rascunho, das suas palavras")))));
+      const lista = (linhas, cls) => el("ul", { class: "b6p-lista " + cls }, ...linhas.map((t) => el("li", { class: "b6p-muda" }, t)));
+      const antes = ["Todos os 23 pedidos do mês esperam a Marina, por e-mail.", "Ninguém mais aprova, de nenhum valor.", "Chargeback recente: não está escrito o que fazer."];
+      const depois = fx.map((f) => f.txt + (f.n != null ? " · " + f.n + " por mês" : ""));
+      const imp = (titulo, linhas, cls) => el("div", { class: "b6p-imp-col " + cls }, el("h3", { class: "b6p-imp-h" }, titulo),
+        el("ul", { class: "b6p-imp-lista" }, ...linhas.map(([t, m]) => el("li", {}, el("p", {}, t), el("p", { class: "t-micro texto-2" }, m)))));
+      const melhora = [
+        ["A espera mediana cai de 1,8 dia para " + ef.esperaTxt + ".", "estimativa, pela regra sobre os 23 pedidos do mês"],
+        [ef.saem + " pedidos por mês saem do seu e-mail; " + mi(ef.liberados) + " por mês deixam de esperar aprovação.", "estimativa"],
+        ["Cerca de " + ef.horas + " horas por mês de idas e voltas devolvidas ao time.", "estimativa: 1h20 por pedido"],
+      ];
+      const piora = [
+        [(faixaN("abaixo") || 11) + " pedidos por mês abaixo de " + rs(r.auto || 5000) + " passam sem ninguém olhar.", "medido: a faixa de valor dos pedidos do mês"],
+        ["A Tesouraria passa a decidir " + (faixaN("de R$ 5") || 8) + " pedidos por mês: mais trabalho para o Caio e a Débora.", "estimativa"],
+        ["Um lojista com chargeback antigo (mais de 90 dias) passa pela regra normal.", "não medido: vou observar os casos que você desfaz"],
+      ];
+      const CONFLITOS = [
+        { id: "planilha", txt: "A planilha \"Antecipações 2026\" pede o ok da Marina em todo pedido. Você disse que até R$ 50 mil não precisa.", escolha: "Usar o que eu disse hoje" },
+        { id: "procedimento", txt: "O procedimento escrito não fala de chargeback. Você disse: com chargeback, sempre você.", escolha: "Usar o que eu disse hoje" },
+      ];
+      const pend = el("ol", { class: "r-pend" });
+      const publicar = btn("btn-primario btn-grande btn-largo", "Publicar", () => publicarJa(false));
+      const motivo = el("p", { class: "t-pequeno texto-2" });
+      const mesmoAssim = btn("btn-quieto btn-sm", "Publicar mesmo assim, com a pergunta em aberto", () => publicarJa(true));
+      const depoisBox = el("div", { class: "b6p-depois" });
+      const onde = CANAIS.filter((c) => e.skillEm && e.skillEm[c.id]).map((c) => c.nome);
+      const quemUsa = el("div", { class: "r-quem-usa" }, el("p", { class: "t-micro texto-2" }, "Quem vai usar"),
+        el("p", {}, "Caio e Débora (Tesouraria)" + (r.slack ? ", Marina e " + DOUGLAS().primeiro + " no #antecipacoes" : "") + (onde.length ? "; nos assistentes da empresa: " + onde.join(", ").replace(/, ([^,]*)$/, " e $1") : "") + "."),
+        el("p", { class: "t-micro texto-2" }, "Os assistentes vêm de Configurações e valem para todas as skills. ", el("button", { class: "link", type: "button", on: { click: () => SK.ir("config") } }, "Mudar em Configurações")));
+      function desenhar() {
+        pend.replaceChildren();
+        CONFLITOS.forEach((c, i) => {
+          const ok = !!b.conf[c.id] || e.regraAprovada;
+          pend.append(el("li", { class: "r-pend-item" + (ok ? " ok" : "") }, el("span", { class: "r-pend-n" }, ok ? ic("check", "ico-sm") : String(i + 1)),
+            el("div", { class: "pilha", style: { "--gap": "6px" } }, el("p", {}, c.txt), ok ? el("p", { class: "t-pequeno r-ok" }, "Resolvido: vale o que você disse.") : btn("btn-secundario btn-sm", c.escolha, () => { b.conf[c.id] = true; SK.salvar(); desenhar(); }))));
+        });
+        pend.append(el("li", { class: "r-pend-item" + (r.exc ? " ok" : "") }, el("span", { class: "r-pend-n" }, r.exc ? ic("check", "ico-sm") : String(CONFLITOS.length + 1)),
+          el("div", { class: "pilha", style: { "--gap": "6px" } }, el("p", {}, "E quando o lojista teve chargeback nos últimos 90 dias?"),
+            r.exc ? el("p", { class: "t-pequeno r-ok" }, "Respondida: sempre você, qualquer valor.") : btn("btn-secundario btn-sm", "Responder na conversa", () => SK.ir(5)))));
+        const conflitosOk = CONFLITOS.every((c) => b.conf[c.id]) || e.regraAprovada;
+        publicar.disabled = !conflitosOk || !r.exc || e.regraAprovada; publicar.hidden = !!e.regraAprovada;
+        mesmoAssim.hidden = !conflitosOk || r.exc || e.regraAprovada;
+        motivo.textContent = e.regraAprovada ? "" : !conflitosOk ? "Antes, resolva os conflitos abaixo." : !r.exc ? "Falta a pergunta em aberto, abaixo." : "Tudo pronto.";
+        depoisBox.replaceChildren();
+        if (e.regraAprovada) depoisBox.append(el("div", { class: "r-publicada entra" },
+          el("p", { class: "forte" }, ic("check", "ico-sm"), " Publicada: " + D.skill.nome + " · " + D.skill.versao + ", aprovada por " + D.skill.aprovadaPor + " " + D.skill.quando + "."),
+          el("p", { class: "t-pequeno texto-2" }, "Próximo passo: decidir o que cada área pode ver."),
+          btn("btn-primario", "Ir para Acessos", () => SK.ir(7), ic("seta", "ico-sm"))));
+      }
+      function publicarJa(comAberta) {
+        e.regraAprovada = true; b.comAberta = !!comAberta; padraoPergunta(e);
+        if (!Object.values(e.skillEm || {}).some(Boolean)) e.skillEm = { claude: true, chatgpt: false, grok: false, slack: true };
+        SK.salvar(); desenhar(); SK.anunciar("Skill publicada.");
+      }
+      raiz.append(el("div", { class: "r-pub-grade" },
+        el("div", { class: "pilha", style: { "--gap": "16px" } },
+          el("section", { class: "cartao" }, el("h2", { class: "b-h2" }, "Antes e depois"),
+            el("div", { class: "r-ad" }, el("div", { class: "r-ad-col r-ad-antes" }, el("p", { class: "t-micro texto-2 forte" }, "Como é hoje"), lista(antes, "")),
+              el("div", { class: "r-ad-col r-ad-depois" }, el("p", { class: "t-micro texto-2 forte" }, "Como fica, com as suas respostas"), lista(depois, ""))),
+            el("p", { class: "t-micro texto-2" }, "Marcado: o que muda.")),
+          el("section", { class: "cartao" }, el("h2", { class: "b-h2" }, "Impacto esperado"),
+            el("div", { class: "r-imp" }, imp("O que melhora", melhora, "r-imp-col r-imp-bom"), imp("O que pode piorar", piora, "r-imp-col r-imp-ruim"))),
+          el("section", { class: "cartao" }, el("h2", { class: "b-h2" }, "Limites desta skill"), guardasLista())),
+        el("aside", { class: "cartao r-pub-lado" }, el("h2", { class: "b-h2" }, "Para publicar"), publicar, motivo, mesmoAssim, depoisBox, pend, quemUsa)));
+      function guardasLista() {
+        const ul = el("ul", { class: "b6-guardas" });
         GUARDAS.forEach((gd) => {
           const efeitoP = el("p", { class: "t-micro texto-2 b6-guarda-ef" }, b.guarda[gd.id] ? gd.sim : gd.nao);
-          let ctrl;
-          if (gd.trava) ctrl = el("span", { class: "b6-trava", title: "Sempre ligado" }, ic("cadeado", "ico-sm"));
-          else ctrl = SK.toggle(gd.txt, !!b.guarda[gd.id], (v) => { b.guarda[gd.id] = v; SK.salvar(); efeitoP.textContent = v ? gd.sim : gd.nao; if ((gd.id === "escreve" || gd.id === "parcial") && previaAtual === "slack") desenharPrevia("slack", false); });
-          if (gd.trava) lista.append(el("li", { class: "b6-guarda travada" }, el("div", { class: "b6-guarda-linha" }, ctrl, el("span", { class: "b6-guarda-txt" }, gd.txt)), efeitoP));
-          else { ctrl.classList.add("b6-guarda-tg"); lista.append(el("li", { class: "b6-guarda" }, ctrl, efeitoP)); }
+          if (gd.trava) { ul.append(el("li", { class: "b6-guarda travada" }, el("div", { class: "b6-guarda-linha" }, el("span", { class: "b6-trava", title: "Sempre ligado" }, ic("cadeado", "ico-sm")), el("span", { class: "b6-guarda-txt" }, gd.txt)), efeitoP)); return; }
+          const t = SK.toggle(gd.txt, !!b.guarda[gd.id], (v) => { b.guarda[gd.id] = v; SK.salvar(); efeitoP.textContent = v ? gd.sim : gd.nao; });
+          t.classList.add("b6-guarda-tg"); ul.append(el("li", { class: "b6-guarda" }, t, efeitoP));
         });
-        return lista;
+        return ul;
       }
-
-      /* (2) o resultado: o buraco caindo, e o que volta */
-      const g = grafico({ foco: true });
-      g.selecionar("antecipacao");
-      const N = (cls, valor, frase) => el("div", { class: "b6-heroi " + cls }, el("p", { class: "b6-heroi-v num" }, valor), el("p", { class: "b6-heroi-f" }, frase));
-      const horasEl = N("", ef.horas + " horas", "por mês devolvidas ao time");
-      const reaisEl = N("", mi(ef.liberados), "por mês deixou de esperar aprovação");
-      const rever = btn("btn-quieto btn-sm b6-rever", "Ver de novo", () => tocar(true), ic("reiniciar", "ico-sm"));
-      const resultado = el("section", { class: "cartao b6-resultado", "aria-label": "O resultado" },
-        el("div", { class: "b6-res-cab" }, el("h2", { class: "b6-res-titulo" }, "O buraco caiu"), el("p", { class: "voz b6-res-voz" }, "A espera saiu de 1,8 dia para " + ef.esperaTxt + ". E ninguém precisou te chamar."), rever),
-        el("div", { class: "b6-res-grade" },
-          el("div", { class: "b6-res-plot" }, g.el),
-          el("div", { class: "b6-res-nums" }, horasEl, reaisEl,
-            el("div", { class: "b6-res-uso" },
-              el("p", {}, el("span", { class: "forte num" }, D.uso.semana + " vezes usada"), " esta semana, ", el("span", { class: "forte num" }, D.uso.semChamar + " sem te chamar"), ". As outras " + D.uso.paramNaExcecao + " pararam no chargeback e chamaram você, como a regra pede."),
-              el("p", {}, "A analista que entrou há 2 semanas fez 6 antecipações certas sem chamar ninguém. A regra respondeu no Slack, na hora.")))),
-        el("p", { class: "t-micro texto-2 b6-conta" }, "Como eu conto: " + ef.saem + " pedidos por mês saem do seu e-mail, cada um com cerca de 1h20 de idas e voltas entre o Caio, você e o lojista. A espera é a mediana dos 23 pedidos do mês."));
-
-      /* (3) onde ela vive */
-      const canaisSec = el("section", { class: "b6-canais", "aria-label": "Onde ela vive" });
-      const previa = el("section", { class: "b6-previa", "aria-label": "Como fica" });
-      const meio = el("div", { class: "b6-meio" }, canaisSec, previa);
-      const fim = el("div", { class: "fila b6-fim" }, btn("btn-primario", "Próximo: quem vê o quê", () => SK.ir(7), ic("seta", "ico-sm")));
-      raiz.append(cartao, resultado, meio, fim);
-      const ordemAprovada = () => { raiz.classList.add("b6-aprovado"); raiz.insertBefore(resultado, cartao); };
       sec.append(raiz);
-
-      let tocou = false;
-      const self = this;
-      function tocar(denovo) {
-        const anim = !SK.reduzido();
-        g.mover(0.92, null, false);
-        const fazer = () => {
-          g.mover(ef.intensidade, "agora · " + ef.esperaTxt, anim, "antes · 1,8 dia");
-          const nh = horasEl.querySelector(".b6-heroi-v"), nr = reaisEl.querySelector(".b6-heroi-v");
-          if (anim) { contarExato(nh, ef.horas, (x) => Math.round(x) + " horas", 1100); contarExato(nr, ef.liberados, (x) => mi(Math.max(x, 1000)), 1100); }
-        };
-        if (anim) SK.depois(denovo ? 120 : 250, fazer); else fazer();
-      }
-      function contarTexto(alvo, ate, fmt, ms) {
-        const t0 = performance.now();
-        const passo = (t) => { const p = Math.min(1, (t - t0) / ms), k = 1 - Math.pow(1 - p, 3); alvo.textContent = fmt(ate * k); if (p < 1) SK.quadro(passo); };
-        SK.quadro(passo);
-      }
-      self._tocar = () => {
-        if (!e.regraAprovada) return;
-        const io = new IntersectionObserver((ents) => { if (ents.some((x) => x.isIntersecting) && !tocou) { tocou = true; tocar(false); io.disconnect(); } }, { threshold: 0.35 });
-        io.observe(resultado); observadores.push(io);
-      };
-      if (SK.reduzido()) g.mover(ef.intensidade, "agora · " + ef.esperaTxt, false, "antes · 1,8 dia");
-
-      function aprovar() { e.regraAprovada = true; SK.salvar(); desenharTopo(true, true); ordemAprovada(); resultado.hidden = false; meio.hidden = false; fim.hidden = false; mostrarCanais(true); window.scrollTo({ top: 0, behavior: SK.reduzido() ? "auto" : "smooth" }); self._tocar(); }
-
-      let previaAtual = null;
-      function mostrarCanais(anim) {
-        canaisSec.replaceChildren(el("h2", { class: "b-h2" }, "Onde ela vive"));
-        const grade = el("div", { class: "b6-grade-canais" });
-        CANAIS.forEach((c, i) => {
-          const t = SK.toggle(c.nome, !!e.skillEm[c.id], (v) => { e.skillEm[c.id] = v; SK.salvar(); if (v) { b.canal = c.id; SK.salvar(); } desenharPrevia(v ? c.id : null, true); tile.classList.toggle("ligado", v); });
-          t.setAttribute("aria-describedby", "b6-onde-" + c.id);
-          const tile = el("div", { class: "b6-canal" + (e.skillEm[c.id] ? " ligado" : "") + (anim ? " entra" : ""), style: { "--atraso": i * 60 + "ms" } },
-            marcaCanal(c), el("div", { class: "b6-canal-txt" }, t, el("p", { class: "t-pequeno texto-2", id: "b6-onde-" + c.id }, c.onde)));
-          grade.append(tile);
-        });
-        canaisSec.append(grade);
-        desenharPrevia(null, false);
-      }
-      function desenharPrevia(preferido, anim) {
-        const ligados = CANAIS.filter((c) => e.skillEm[c.id]);
-        previa.replaceChildren();
-        if (!ligados.length) { previa.append(el("div", { class: "b6-vazio" }, ic("chat", "ico-lg"), el("p", { class: "texto-2" }, "Ligue um lugar e veja a skill respondendo lá."))); previaAtual = null; return; }
-        const alvo = preferido && ligados.some((c) => c.id === preferido) ? preferido : previaAtual && ligados.some((c) => c.id === previaAtual) ? previaAtual : (b.canal && ligados.some((c) => c.id === b.canal) ? b.canal : ligados[ligados.length - 1].id);
-        const novo = alvo !== previaAtual || preferido;
-        previaAtual = alvo;
-        const abas = el("div", { class: "segmentado", role: "tablist", "aria-label": "Prévia por lugar" });
-        ligados.forEach((c) => abas.append(el("button", { role: "tab", type: "button", "aria-selected": c.id === alvo ? "true" : "false", on: { click: () => desenharPrevia(c.id, true) } }, c.nome)));
-        previa.append(abas, alvo === "slack" ? slack(anim && novo) : conversaIA(CANAIS.find((c) => c.id === alvo), anim && novo));
-      }
-
-      const aprovada = !!e.regraAprovada;
-      desenharTopo(aprovada, animarSkill);
-      resultado.hidden = meio.hidden = fim.hidden = !aprovada;
-      if (aprovada) { ordemAprovada(); mostrarCanais(animarSkill); }
+      desenhar();
     },
-    entrar() { if (this._tocar) this._tocar(); },
     sair() { soltar(); },
     padrao(e) {
       padraoPergunta(e);
